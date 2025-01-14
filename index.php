@@ -4,14 +4,30 @@ $conn = mysqli_connect("localhost", "root", '', "aasra");
 
 // Check if form is submitted
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Save form data
+    // Save form data along with file
     if (isset($_POST['save_form'])) {
         $name = $_POST['name'];
         $fname = $_POST['fname'];
         $mobile_no = $_POST['mobile_no'];
         $date_of_joining = $_POST['date_of_joining'];
 
-        $query = "INSERT INTO baghat (name, fname, mobile_no, date_of_joining) VALUES ('$name', '$fname', '$mobile_no', '$date_of_joining')";
+        // File upload
+        $file_name = '';
+        if (isset($_FILES['file']) && $_FILES['file']['error'] == 0) {
+            $file_name = $_FILES['file']['name'];
+            $file_tmp = $_FILES['file']['tmp_name'];
+            $file_path = 'uploads/' . $file_name; // specify the upload directory
+
+            // Move file to the uploads directory
+            if (move_uploaded_file($file_tmp, $file_path)) {
+                // File uploaded successfully
+            } else {
+                $_SESSION['status'] = "Error uploading file!";
+            }
+        }
+
+        // Insert form data and file name into the database
+        $query = "INSERT INTO baghat (name, fname, mobile_no, date_of_joining, file_name) VALUES ('$name', '$fname', '$mobile_no', '$date_of_joining', '$file_name')";
         if (mysqli_query($conn, $query)) {
             $_SESSION['status'] = "Record saved successfully!";
         } else {
@@ -29,7 +45,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $mobile_no = $_POST['mobile_no'];
         $date_of_joining = $_POST['date_of_joining'];
 
-        $query = "UPDATE baghat SET name='$name', fname='$fname', mobile_no='$mobile_no', date_of_joining='$date_of_joining' WHERE id='$baghat_id'";
+        // File upload (if provided)
+        $file_name = $_FILES['file']['name'] ? $_FILES['file']['name'] : $_POST['existing_file'];
+        if (isset($_FILES['file']) && $_FILES['file']['error'] == 0) {
+            $file_tmp = $_FILES['file']['tmp_name'];
+            $file_path = 'uploads/' . $file_name;
+
+            if (move_uploaded_file($file_tmp, $file_path)) {
+                // File uploaded successfully
+            } else {
+                $_SESSION['status'] = "Error uploading file!";
+            }
+        }
+
+        $query = "UPDATE baghat SET name='$name', fname='$fname', mobile_no='$mobile_no', date_of_joining='$date_of_joining', file_name='$file_name' WHERE id='$baghat_id'";
         if (mysqli_query($conn, $query)) {
             $_SESSION['status'] = "Record updated successfully!";
         } else {
@@ -74,23 +103,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <h5 class="modal-title" id="BaghatLabel">Baghat Data</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="index.php" method="POST">
+            <form action="index.php" method="POST" enctype="multipart/form-data">
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="name">Name</label>
-                        <input type="text" name="name" class="form-control" placeholder="Enter Name" required>
+                        <input type="text" name="name" id="name" class="form-control" placeholder="Enter Name" required>
                     </div>
                     <div class="form-group">
                         <label for="fname">Father Name</label>
-                        <input type="text" name="fname" class="form-control" placeholder="Father Name" required>
+                        <input type="text" name="fname" id="fname" class="form-control" placeholder="Father Name" required>
                     </div>
                     <div class="form-group">
                         <label for="mobile_no">Mobile Number</label>
-                        <input type="text" name="mobile_no" class="form-control" placeholder="Mobile Number" required>
+                        <input type="text" name="mobile_no" id="mobile_no" class="form-control" placeholder="Mobile Number" required>
                     </div>
                     <div class="form-group">
                         <label for="date_of_joining">Date of Joining</label>
-                        <input type="date" name="date_of_joining" class="form-control" placeholder="Date of Joining" required>
+                        <input type="date" name="date_of_joining" id="date_of_joining" class="form-control" placeholder="Date of Joining" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="file">Upload File</label>
+                        <input type="file" name="file" id="file" class="form-control">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -127,7 +160,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <label for="view_date_of_joining">Date of Joining</label>
                     <input type="date" id="view_date_of_joining" class="form-control" disabled>
                 </div>
-                <button id="downloadPdf" class="btn btn-success">Download as PDF</button>
+                <div class="form-group">
+                    <label for="view_file">Uploaded File</label>
+                    <input type="text" id="view_file" class="form-control" disabled>
+                </div>
+                <button id="downloadFile" class="btn btn-success">Download File</button>
+                <button id="downloadPdf" class="btn btn-info">Download as PDF</button>
             </div>
         </div>
     </div>
@@ -141,7 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <?php
                 if (isset($_SESSION['status']) && $_SESSION['status'] != '') {
                     echo "<div class='alert alert-warning alert-dismissible fade show' role='alert'>
-                        <strong>Hey!</strong> <h5>{$_SESSION['status']}</h5>
+                        <strong>Hey!</strong> {$_SESSION['status']}
                         <button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>
                     </div>";
                     unset($_SESSION['status']);
@@ -179,10 +217,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <td>{$row['mobile_no']}</td>
                                 <td>{$row['date_of_joining']}</td>
                                 <td>
-                                    <button class='btn btn-success view_btn' data-id='{$row['id']}' data-name='{$row['name']}' data-fname='{$row['fname']}' data-mobile_no='{$row['mobile_no']}' data-date_of_joining='{$row['date_of_joining']}'>View</button>
+                                    <button class='btn btn-success view_btn' data-id='{$row['id']}' data-name='{$row['name']}' data-fname='{$row['fname']}' data-mobile_no='{$row['mobile_no']}' data-date_of_joining='{$row['date_of_joining']}' data-file='{$row['file_name']}'>View</button>
                                 </td>
                                 <td>
-                                    <button class='btn btn-info edit_btn' data-id='{$row['id']}' data-name='{$row['name']}' data-fname='{$row['fname']}' data-mobile_no='{$row['mobile_no']}' data-date_of_joining='{$row['date_of_joining']}'>Edit</button>
+                                    <button class='btn btn-info edit_btn' data-id='{$row['id']}' data-name='{$row['name']}' data-fname='{$row['fname']}' data-mobile_no='{$row['mobile_no']}' data-date_of_joining='{$row['date_of_joining']}' data-file='{$row['file_name']}'>Edit</button>
                                     <button class='btn btn-danger delete_btn' data-id='{$row['id']}'>Delete</button>
                                 </td>
                             </tr>";
@@ -197,9 +235,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 </div>
 
 <!-- Scripts -->
-<script src="https://code.jquery.com/jquery-3.7.1.js" integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4=" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.min.js" integrity="sha384-0pUGZvbkm6XF6gxjEnlmuGrJXVbNuzT9qBBavbLwCsOGabYfZo0T0to5eqruptLy" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
 
 <script>
     $(document).ready(function () {
@@ -209,14 +247,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             var fname = $(this).data('fname');
             var mobile_no = $(this).data('mobile_no');
             var date_of_joining = $(this).data('date_of_joining');
-            
+            var file_name = $(this).data('file');
+
             // Populate the modal fields
             $('#view_name').val(name);
             $('#view_fname').val(fname);
             $('#view_mobile_no').val(mobile_no);
             $('#view_date_of_joining').val(date_of_joining);
+            $('#view_file').val(file_name);
 
             $('#ViewBaghat').modal('show');
+        });
+
+        // Edit Button click event (open modal with pre-filled data)
+        $('.edit_btn').click(function () {
+            var id = $(this).data('id');
+            var name = $(this).data('name');
+            var fname = $(this).data('fname');
+            var mobile_no = $(this).data('mobile_no');
+            var date_of_joining = $(this).data('date_of_joining');
+            var file_name = $(this).data('file');
+
+            // Populate the modal fields for editing
+            $('#name').val(name);
+            $('#fname').val(fname);
+            $('#mobile_no').val(mobile_no);
+            $('#date_of_joining').val(date_of_joining);
+            $('#existing_file').val(file_name);
+            $('#Baghat').modal('show');
         });
 
         // Delete Button click event (with confirmation)
@@ -248,47 +306,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             doc.setFont("helvetica", "bold");
             doc.setFontSize(18);
             doc.text("Ni Aasre Da Aasra", 105, 10, { align: "center" });
-            
+
             doc.autoTable({
                 startY: 20,
-                head: [['Name', 'Father Name', 'Mobile No', 'Date of Joining']],
+                head: [['Name', 'Father Name', 'Mobile No', 'Date of Joining', 'Uploaded File']],
                 body: [
                     [
-                         $('#view_name').val(), 
-                         $('#view_fname').val(),
-                         $('#view_mobile_no').val(), 
-                         $('#view_date_of_joining').val(),
-                    ]
-                ],
-                theme: 'grid',
-                styles: { fontSize: 12 }
+                        $('#view_name').val(),
+                        $('#view_fname').val(),
+                        $('#view_mobile_no').val(),
+                        $('#view_date_of_joining').val(),
+                        $('#view_file').val(),
+                    ],
+                ]
             });
 
             doc.save('baghat_data.pdf');
         });
 
-        // Edit Button click event
-        $('.edit_btn').click(function () {
-            var baghat_id = $(this).data('id');
-            var name = $(this).data('name');
-            var fname = $(this).data('fname');
-            var mobile_no = $(this).data('mobile_no');
-            var date_of_joining = $(this).data('date_of_joining');
-            
-            // Populate the modal with current data
-            $('#Baghat').find('input[name="name"]').val(name);
-            $('#Baghat').find('input[name="fname"]').val(fname);
-            $('#Baghat').find('input[name="mobile_no"]').val(mobile_no);
-            $('#Baghat').find('input[name="date_of_joining"]').val(date_of_joining);
-
-            // Set the hidden input field for the baghat_id to update the record
-            $('#Baghat').find('form').append('<input type="hidden" name="baghat_id" value="' + baghat_id + '">');
-            $('#Baghat').find('button[type="submit"]').attr('name', 'edit_baghat');
-
-            $('#Baghat').modal('show');
+        // Download file functionality
+        $('#downloadFile').click(function () {
+            var fileName = $('#view_file').val();
+            if (fileName) {
+                window.location.href = 'download.php?file=' + encodeURIComponent(fileName);
+            } else {
+                alert("No file available for download.");
+            }
         });
     });
 </script>
-
 </body>
 </html>
