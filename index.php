@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 </head>
 <body>
 
-<!-- Baghat Add Modal -->
+<!-- Baghat Add / Edit Modal -->
 <div class="modal fade" id="Baghat" tabindex="-1" aria-labelledby="Baghat" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -119,16 +119,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                     <div class="form-group">
                         <label for="date_of_joining">Date of Joining</label>
-                        <input type="date" name="date_of_joining" id="date_of_joining" class="form-control" placeholder="Date of Joining" required>
+                        <input type="date" name="date_of_joining" id="date_of_joining" class="form-control" required>
                     </div>
                     <div class="form-group">
                         <label for="file">Upload File</label>
                         <input type="file" name="file" id="file" class="form-control">
                     </div>
+                    <input type="hidden" name="baghat_id" id="baghat_id">
+                    <input type="hidden" name="existing_file" id="existing_file">
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" name="save_form" class="btn btn-primary">Save</button>
+                    <button type="submit" name="save_form" id="save_btn" class="btn btn-primary">Save</button>
                 </div>
             </form>
         </div>
@@ -259,7 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $('#ViewBaghat').modal('show');
         });
 
-        // Edit Button click event (open modal with pre-filled data)
+        // Edit Button click event
         $('.edit_btn').click(function () {
             var id = $(this).data('id');
             var name = $(this).data('name');
@@ -274,10 +276,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $('#mobile_no').val(mobile_no);
             $('#date_of_joining').val(date_of_joining);
             $('#existing_file').val(file_name);
+
+            // Change form action and button name for editing
+            $('#Baghat form').attr('action', 'index.php');
+            $('#save_btn').attr('name', 'edit_baghat');
+            $('#save_btn').val('Update');
+            $('#baghat_id').val(id);
+
             $('#Baghat').modal('show');
         });
 
-        // Delete Button click event (with confirmation)
+        // Delete Button click event
         $('.delete_btn').click(function () {
             var baghat_id = $(this).data('id');
             var confirmation = confirm("Are you sure you want to delete this record?");
