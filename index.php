@@ -6,9 +6,9 @@ $conn = mysqli_connect("localhost", "root", '', "aasra");
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Save form data along with file
     if (isset($_POST['save_form'])) {
-        $name = $_POST['name'];
-        $fname = $_POST['fname'];
-        $mobile_no = $_POST['mobile_no'];
+        $name = mysqli_real_escape_string($conn, $_POST['name']);
+        $fname = mysqli_real_escape_string($conn, $_POST['fname']);
+        $mobile_no = mysqli_real_escape_string($conn, $_POST['mobile_no']);
         $date_of_joining = $_POST['date_of_joining'];
 
         // File upload
@@ -19,15 +19,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $file_path = 'uploads/' . $file_name; // specify the upload directory
 
             // Move file to the uploads directory
-            if (move_uploaded_file($file_tmp, $file_path)) {
-                // File uploaded successfully
-            } else {
+            if (!move_uploaded_file($file_tmp, $file_path)) {
                 $_SESSION['status'] = "Error uploading file!";
+                header("Location: index.php");
+                exit();
             }
         }
 
         // Insert form data and file name into the database
-        $query = "INSERT INTO baghat (name, fname, mobile_no, date_of_joining, file_name) VALUES ('$name', '$fname', '$mobile_no', '$date_of_joining', '$file_name')";
+        $query = "INSERT INTO baghat (name, fname, mobile_no, date_of_joining, file_name, status) 
+                  VALUES ('$name', '$fname', '$mobile_no', '$date_of_joining', '$file_name', 'active')";
         if (mysqli_query($conn, $query)) {
             $_SESSION['status'] = "Record saved successfully!";
         } else {
@@ -40,10 +41,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Edit record
     if (isset($_POST['edit_baghat'])) {
         $baghat_id = $_POST['baghat_id'];
-        $name = $_POST['name'];
-        $fname = $_POST['fname'];
-        $mobile_no = $_POST['mobile_no'];
+        $name = mysqli_real_escape_string($conn, $_POST['name']);
+        $fname = mysqli_real_escape_string($conn, $_POST['fname']);
+        $mobile_no = mysqli_real_escape_string($conn, $_POST['mobile_no']);
         $date_of_joining = $_POST['date_of_joining'];
+        $status = $_POST['status']; // status can be 'active' or 'inactive'
+        $left_date = $status === 'inactive' ? $_POST['left_date'] : NULL; // only set left date if inactive
 
         // File upload (if provided)
         $file_name = $_FILES['file']['name'] ? $_FILES['file']['name'] : $_POST['existing_file'];
@@ -51,14 +54,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $file_tmp = $_FILES['file']['tmp_name'];
             $file_path = 'uploads/' . $file_name;
 
-            if (move_uploaded_file($file_tmp, $file_path)) {
-                // File uploaded successfully
-            } else {
+            if (!move_uploaded_file($file_tmp, $file_path)) {
                 $_SESSION['status'] = "Error uploading file!";
+                header("Location: index.php");
+                exit();
             }
         }
 
-        $query = "UPDATE baghat SET name='$name', fname='$fname', mobile_no='$mobile_no', date_of_joining='$date_of_joining', file_name='$file_name' WHERE id='$baghat_id'";
+        $query = "UPDATE baghat SET name='$name', fname='$fname', mobile_no='$mobile_no', 
+                  date_of_joining='$date_of_joining', file_name='$file_name', status='$status', 
+                  left_date='$left_date' WHERE id='$baghat_id'";
+
         if (mysqli_query($conn, $query)) {
             $_SESSION['status'] = "Record updated successfully!";
         } else {
@@ -92,6 +98,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        /* Custom Dropdown Styling */
+        .custom-dropdown {
+            width: 150px; /* Decrease the width of the dropdown */
+            font-size: 0.9rem; /* Decrease font size */
+        }
+
+        /* Align the dropdown to the left */
+        .custom-dropdown-container {
+            text-align: left; /* Left alignment for the dropdown */
+            display: inline-block;
+            margin-right: 30px; /* Space for search on the right */
+        }
+
+        /* Custom search box styling */
+        .search-container {
+            display: flex;
+            margin-left: 900px;
+        }
+    </style>
 </head>
 <body>
 
@@ -124,6 +150,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <div class="form-group">
                         <label for="file">Upload File</label>
                         <input type="file" name="file" id="file" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="status">Status</label>
+                        <select name="status" id="status" class="form-control" required>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="left_date_group" style="display: none;">
+                        <label for="left_date">Date of Leaving</label>
+                        <input type="date" name="left_date" id="left_date" class="form-control">
                     </div>
                     <input type="hidden" name="baghat_id" id="baghat_id">
                     <input type="hidden" name="existing_file" id="existing_file">
@@ -181,7 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <?php
                 if (isset($_SESSION['status']) && $_SESSION['status'] != '') {
                     echo "<div class='alert alert-warning alert-dismissible fade show' role='alert'>
-                        <strong>Hey!</strong> {$_SESSION['status']}
+                        <strong></strong> {$_SESSION['status']}
                         <button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>
                     </div>";
                     unset($_SESSION['status']);
@@ -195,6 +232,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </h1>
                 </div>
                 <div class="card-body">
+                    <!-- Dropdown and Search -->
+                    <div class="d-flex align-items-center">
+                        <!-- Status Dropdown -->
+                        <div class="form-group mb-3 custom-dropdown-container">
+                            <label for="filter_status">Status</label>
+                            <select id="filter_status" class="form-control custom-dropdown">
+                                <option value="">All</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+
+                        <!-- Search Box -->
+                        <div class="search-container">
+                            <label for="search_input"></label>
+                            <input type="text" id="search_input" class="form-control" placeholder="Search...">
+                        </div>
+                    </div>
                     <table class="table">
                         <thead>
                         <tr>
@@ -203,6 +258,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <th scope="col">Father Name</th>
                             <th scope="col">Mobile No</th>
                             <th scope="col">Date of Joining</th>
+                            <th scope="col">left_date</th>
+                            <th scope="col">Status</th>
                             <th scope="col">View</th>
                             <th scope="col">Action</th>
                         </tr>
@@ -212,17 +269,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $query = "SELECT * FROM baghat";
                         $result = mysqli_query($conn, $query);
                         while ($row = mysqli_fetch_assoc($result)) {
-                            echo "<tr>
+                            echo "<tr data-status='{$row['status']}'>
                                 <td>{$row['id']}</td>
                                 <td>{$row['name']}</td>
                                 <td>{$row['fname']}</td>
                                 <td>{$row['mobile_no']}</td>
                                 <td>{$row['date_of_joining']}</td>
+                                <td>{$row['left_date']}</td>
+                                <td>{$row['status']}</td>
                                 <td>
                                     <button class='btn btn-success view_btn' data-id='{$row['id']}' data-name='{$row['name']}' data-fname='{$row['fname']}' data-mobile_no='{$row['mobile_no']}' data-date_of_joining='{$row['date_of_joining']}' data-file='{$row['file_name']}'>View</button>
                                 </td>
                                 <td>
-                                    <button class='btn btn-info edit_btn' data-id='{$row['id']}' data-name='{$row['name']}' data-fname='{$row['fname']}' data-mobile_no='{$row['mobile_no']}' data-date_of_joining='{$row['date_of_joining']}' data-file='{$row['file_name']}'>Edit</button>
+                                    <button class='btn btn-info edit_btn' data-id='{$row['id']}' data-name='{$row['name']}' data-fname='{$row['fname']}' data-mobile_no='{$row['mobile_no']}' data-date_of_joining='{$row['date_of_joining']}' data-status='{$row['status']}' data-file='{$row['file_name']}'>Edit</button>
                                     <button class='btn btn-danger delete_btn' data-id='{$row['id']}'>Delete</button>
                                 </td>
                             </tr>";
@@ -243,6 +302,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 <script>
     $(document).ready(function () {
+        // Toggle left date input based on status
+        $('#status').change(function() {
+            if ($(this).val() === 'inactive') {
+                $('#left_date_group').show();
+            } else {
+                $('#left_date_group').hide();
+            }
+        });
+
+        // Filter records based on status
+        $('#filter_status').change(function () {
+            var status = $(this).val();
+            $('tbody tr').each(function () {
+                var rowStatus = $(this).data('status');
+                if (status === '' || rowStatus === status) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+        });
+
+        // Search filter for table
+        $('#search_input').on('input', function () {
+            var searchText = $(this).val().toLowerCase();
+            $('table tbody tr').each(function () {
+                var rowText = $(this).text().toLowerCase();
+                if (rowText.indexOf(searchText) !== -1) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+        });
+
         // View Button click event
         $('.view_btn').click(function () {
             var name = $(this).data('name');
@@ -268,6 +362,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             var fname = $(this).data('fname');
             var mobile_no = $(this).data('mobile_no');
             var date_of_joining = $(this).data('date_of_joining');
+            var status = $(this).data('status');
             var file_name = $(this).data('file');
 
             // Populate the modal fields for editing
@@ -275,7 +370,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $('#fname').val(fname);
             $('#mobile_no').val(mobile_no);
             $('#date_of_joining').val(date_of_joining);
+            $('#status').val(status);
             $('#existing_file').val(file_name);
+            if (status === 'inactive') {
+                $('#left_date_group').show();
+            } else {
+                $('#left_date_group').hide();
+            }
 
             // Change form action and button name for editing
             $('#Baghat form').attr('action', 'index.php');
@@ -344,5 +445,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         });
     });
 </script>
+
 </body>
 </html>
