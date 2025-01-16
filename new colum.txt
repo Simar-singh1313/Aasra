@@ -1,0 +1,5 @@
+-- E:\xamppnew\mysql\bin> mysql -u root -p
+use aasra;
+ALTER TABLE baghat ADD COLUMN status ENUM('active', 'inactive') DEFAULT 'inactive';
+ALTER TABLE baghat ADD COLUMN left_date DATE DEFAULT NULL;
+
