@@ -2,8 +2,12 @@
 session_start();
 $conn = mysqli_connect("localhost", "root", '', "aasra");
 
+require 'vendor/autoload.php'; // For PhpSpreadsheet
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+
 // Check if form is submitted
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+if ($_SERVER['REQUEST_METHOD'] == 'POST') 
     // Save form data along with file
     if (isset($_POST['save_form'])) {
         $name = mysqli_real_escape_string($conn, $_POST['name']);
@@ -86,6 +90,66 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         header("Location: index.php");
         exit();
     }
+// Export to Excel with filter
+if (isset($_POST['export_excel'])) {
+    $status_filter = $_POST['status_filter']; // Get selected status filter
+    
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
+
+    // Set header row
+    $sheet->setCellValue('A1', 'ID');
+    $sheet->setCellValue('B1', 'Name');
+    $sheet->setCellValue('C1', 'Father Name');
+    $sheet->setCellValue('D1', 'Mobile No');
+    $sheet->setCellValue('E1', 'Date of Joining');
+    $sheet->setCellValue('F1', 'Left Date');
+    $sheet->setCellValue('G1', 'Status');
+    $sheet->setCellValue('H1', 'File Name');
+
+    // Fetch data from database with status filter
+    $query = "SELECT * FROM baghat";
+    if ($status_filter && $status_filter !== 'both') {
+        $query .= " WHERE status = '$status_filter'";
+    }
+
+    $result = mysqli_query($conn, $query);
+    if (!$result) {
+        die('Error executing query: ' . mysqli_error($conn));
+    }
+
+    $rowCount = 2; // Start from the second row
+    while ($row = mysqli_fetch_assoc($result)) {
+        $sheet->setCellValue('A' . $rowCount, $row['id']);
+        $sheet->setCellValue('B' . $rowCount, $row['name']);
+        $sheet->setCellValue('C' . $rowCount, $row['fname']);
+        $sheet->setCellValue('D' . $rowCount, $row['mobile_no']);
+        $sheet->setCellValue('E' . $rowCount, $row['date_of_joining']);
+        $sheet->setCellValue('F' . $rowCount, $row['left_date']);
+        $sheet->setCellValue('G' . $rowCount, $row['status']);
+        $sheet->setCellValue('H' . $rowCount, $row['file_name']);
+        $rowCount++;
+    }
+
+    // Create the Excel file in memory
+    $writer = new Xlsx($spreadsheet);
+
+    // Clear any output buffer
+    if (ob_get_contents()) {
+        ob_end_clean();
+    }
+
+    // Set proper headers for Excel file download
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment;filename="Baghat_Data_' . date('Y-m-d_His') . '.xlsx"');
+    header('Cache-Control: max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+
+    // Save the file to output
+    $writer->save('php://output');
+    exit();
+
 }
 ?>
 
@@ -243,12 +307,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <option value="inactive">Inactive</option>
                             </select>
                         </div>
-
+                         
                         <!-- Search Box -->
                         <div class="search-container">
                             <label for="search_input"></label>
                             <input type="text" id="search_input" class="form-control" placeholder="Search...">
                         </div>
+                    </div>
+                       <!-- Export Button -->
+                       <form action="index.php" method="POST" class="d-inline float-end">
+                            <button type="submit" name="export_excel" class="btn btn-success">Export to Excel</button>
+                        </form>
                     </div>
                     <table class="table">
                         <thead>
